@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-    # Or trigger for other conditions like tags, or manually if needed
 
 jobs:
   deploy:
@@ -14,18 +13,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check if IP is allowed
+      - name: Get the IP address of the GitHub runner
+        id: get_ip
         run: |
-          # Get the public IP of the EC2 instance
-          PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-          echo "EC2 Public IP: $PUBLIC_IP"
+          RUNNER_IP=$(curl -s https://api.ipify.org)  # Fetches the public IP of the GitHub runner
+          echo "GitHub Runner IP: $RUNNER_IP"
+          echo "::set-output name=runner_ip::$RUNNER_IP"  # Set the runner's IP as output
 
-          # Compare the EC2 public IP with the allowed IP
-          if [[ "$PUBLIC_IP" != "${{ secrets.ALLOWED_IP }}" ]]; then
+      - name: Check if the runner's IP matches the allowed IP
+        run: |
+          ALLOWED_IP="${{ secrets.ALLOWED_IP }}"  # This is the secret stored in GitHub that contains your public IP
+          RUNNER_IP="${{ steps.get_ip.outputs.runner_ip }}"
+          echo "Runner IP: $RUNNER_IP"
+
+          if [[ "$RUNNER_IP" != "$ALLOWED_IP" ]]; then
             echo "Access Denied: Unauthorized IP address.";
-            exit 1;
+            exit 1;  # Exit the workflow with error if IP doesn't match
           else
-            echo "IP address is allowed.";
+            echo "IP address is allowed. Proceeding with deployment.";
           fi
 
       - name: Setup Node.js
@@ -54,4 +59,4 @@ jobs:
           rsync -avz --delete ./build/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/ # Adjust path if needed
 
           # Optionally restart server or run your start script
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx' # Example restart for Apache (adjust to your stack)
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart ubuntu' # Example restart for Apache (adjust to your stack)
