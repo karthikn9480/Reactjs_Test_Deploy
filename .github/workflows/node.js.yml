@@ -13,7 +13,6 @@ jobs:
     strategy:
       matrix:
         node-version: [22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
     - uses: actions/checkout@v4
@@ -24,9 +23,11 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
 
-    - run: npm ci
+    - run: npm ci  # Install dependencies
+    - run: npm run build --if-present  # Build the app
 
-    - run: npm run build --if-present  
+    # Check if the build directory exists
+    - run: ls -la ./build
 
     - name: Setup SSH for EC2 Deployment
       run: |
@@ -35,15 +36,26 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
 
-    - name: Deploy to EC2 instance
+    - name: Verify SSH Connection
       run: |
         # Verify if SSH works with the instance first
         echo "Checking SSH connection..."
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
 
-        # Rsync build files to EC2 instance
-        rsync -avz --delete ./build/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/  # Adjust path if needed
+    - name: Clear contents of /var/www/html
+      run: |
+        # Use SSH to run commands remotely on EC2
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /var/www/html/*'
 
+    - name: Copy dist folder to /var/www/html
+      run: |
+        # Ensure the build directory is there
+        ls -la ./build  # Double-check for the build directory
+        
+        # Rsync build files to EC2 instance
+        rsync -avz --delete ./build/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+
+    - name: Restart Nginx on EC2
+      run: |
         # Optionally restart the Nginx service on EC2
         ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
-
