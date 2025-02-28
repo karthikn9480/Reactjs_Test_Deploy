@@ -1,0 +1,56 @@
+name: Deploy React Application to EC2
+
+on:
+  push:
+    branches:
+      - main
+    # Or trigger for other conditions like tags, or manually if needed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get the IP Address of the GitHub Runner
+        id: get_ip
+        run: echo "::set-output name=ip::$(curl -s https://api.ipify.org)"
+
+      - name: Check if IP is allowed
+        run: |
+          if [[ "${{ steps.get_ip.outputs.ip }}" != "${{ secrets.ALLOWED_IP }}" ]]; then
+            echo "Access Denied: Unauthorized IP address.";
+            exit 1;
+          else
+            echo "IP address is allowed.";
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: |
+          npm install
+
+      - name: Build the React app
+        run: |
+          npm run build
+
+      - name: Setup SSH for EC2 Deployment
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2 instance
+        run: |
+          # Rsync build files to EC2 instance
+          rsync -avz --delete ./build/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/ # Adjust path if needed
+
+          # Optionally restart server or run your start script
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx' # Example restart for Apache (adjust to your stack)
