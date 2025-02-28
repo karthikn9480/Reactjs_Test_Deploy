@@ -24,16 +24,10 @@ jobs:
         cache: 'npm'
 
     - run: npm ci  # Install dependencies
+    - run: npm run build --if-present  # Build the app
 
-    - name: Run Build and Debug
-      run: |
-        # Run build and show logs
-        npm run build --if-present
-        # Show the contents of the root directory to check if build folder exists
-        ls -la
-        # Try showing contents of dist/build if it's not at root
-        ls -la ./dist
-        ls -la ./build # Check if build folder is here
+    # Check if the build directory exists
+    - run: ls -la ./dist
 
     - name: Setup SSH for EC2 Deployment
       run: |
@@ -56,10 +50,10 @@ jobs:
     - name: Copy dist folder to /var/www/html
       run: |
         # Ensure the build directory is there
-        ls -la ./build  # Double-check for the build directory
+        ls -la ./dist  # Double-check for the build directory
         
         # Rsync build files to EC2 instance
-        rsync -avz --delete ./build/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+        rsync -avz --delete ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
 
     - name: Restart Nginx on EC2
       run: |
