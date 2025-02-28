@@ -14,13 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Get the IP Address of the GitHub Runner
-        id: get_ip
-        run: echo "::set-output name=ip::$(curl -s https://api.ipify.org)"
-
       - name: Check if IP is allowed
         run: |
-          if [[ "${{ steps.get_ip.outputs.ip }}" != "${{ secrets.ALLOWED_IP }}" ]]; then
+          # Get the public IP of the EC2 instance
+          PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+          echo "EC2 Public IP: $PUBLIC_IP"
+
+          # Compare the EC2 public IP with the allowed IP
+          if [[ "$PUBLIC_IP" != "${{ secrets.ALLOWED_IP }}" ]]; then
             echo "Access Denied: Unauthorized IP address.";
             exit 1;
           else
