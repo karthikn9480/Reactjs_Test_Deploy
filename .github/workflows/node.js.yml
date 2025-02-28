@@ -1,0 +1,42 @@
+name: Deploy React Application to EC2
+
+on:
+push:
+branches: [ "main" ]
+
+jobs:
+build:
+
+runs-on: self-hosted
+
+strategy:
+  matrix:
+    node-version: [20.x]
+
+steps:
+- uses: actions/checkout@v3
+
+- name: Get the IP Address of the GitHub Runner
+  id: get_ip
+  run: echo "::set-output name=ip::$(curl -s https://api.ipify.org)"
+
+- name: Check if IP is allowed
+  run: |
+   if [[ "${{ steps.get_ip.outputs.ip }}" != "${{ secrets.ALLOWED_IP }}" ]]; then
+    echo "Access Denied: Unauthorized IP address.";
+    exit 1;
+   else
+    echo "IP address is allowed.";
+   fi
+
+- name: Use Node.js ${{ matrix.node-version }}
+  uses: actions/setup-node@v3
+  with:
+    node-version: ${{ matrix.node-version }}
+    cache: 'npm'
+- run: npm ci
+- run: npm run build --if-present
+- name: Clear contents of /var/www/html
+  run: sudo rm -rf /var/www/html/*
+- name: Copy dist folder to /var/www/html
+  run: sudo cp -r dist/* /var/www/html
