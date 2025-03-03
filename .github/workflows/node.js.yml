@@ -40,10 +40,10 @@ jobs:
         chmod 600 ~/.ssh/known_hosts  # Set permissions to allow writing
         # Add the EC2 host to known_hosts to avoid SSH prompts
         ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
-        
+
     - name: Verify SSH Connection
       run: |
-        # Verify if SSH works with the instance first using password
+        # Verify if SSH works with the instance first using password-based authentication
         echo "Checking SSH connection..."
         sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
 
@@ -62,8 +62,8 @@ jobs:
         # Ensure the build directory is there
         ls -la ./dist  # Double-check for the build directory
         
-        # Rsync build files to EC2 instance
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+        # Rsync build files to EC2 instance using password-based SSH
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "sshpass -p '${{ secrets.EC2_PASSWORD }}' ssh -o StrictHostKeyChecking=no" ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
 
     - name: Restart Nginx on EC2
       run: |
