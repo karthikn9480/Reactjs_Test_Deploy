@@ -15,8 +15,7 @@ jobs:
         node-version: [22.x]
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
@@ -27,10 +26,8 @@ jobs:
     - run: npm ci  # Install dependencies
     - run: npm run build --if-present  # Build the app
 
-    - name: Verify dist folder exists
-      run: |
-        echo "Listing contents of the build directory:"
-        ls -la ./dist
+    # Check if  the build directory exists
+    - run: ls -la ./dist
 
     - name: Setup SSH for EC2 Deployment
       run: |
@@ -38,27 +35,23 @@ jobs:
         echo "${{ secrets.EC2_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
-
-    - name: Ensure /var/www/html/ has correct permissions
+    - name: Verify SSH Connection
       run: |
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /var/www/html/'
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /var/www/html/'
-
-    - name: Rsync build files with sudo
+        # Verify if SSH works with the instance first
+        echo "Checking SSH connection..."
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
+    - name: Clear contents of /var/www/html
       run: |
-        # Print the current working directory and list files
-        echo "Current directory:"
-        pwd
-        echo "Listing contents of the build directory:"
-        ls -la ./dist
-        # Rsync to EC2 instance
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'rsync -avz --delete ./dist/ /var/www/html/'
-
-    - name: Set proper permissions for Nginx
+        # Use SSH to run commands remotely on EC2
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rm -rf /var/www/html/*'
+    - name: Copy dist folder to /var/www/html
       run: |
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R www-data:www-data /var/www/html/'
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 755 /var/www/html/'
-
+        # Ensure the build directory is there
+        ls -la ./dist  # Double-check for the build directory
+        
+        # Rsync build files to EC2 instance
+        rsync -avz --delete ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
     - name: Restart Nginx on EC2
       run: |
+        # Optionally restart the Nginx service on EC2
         ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
