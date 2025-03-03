@@ -33,16 +33,26 @@ jobs:
     - name: Install sshpass
       run: sudo apt-get install sshpass -y
 
+    # Configure AWS CLI with credentials
+    - name: Configure AWS credentials
+      run: |
+        mkdir -p ~/.aws
+        echo "[default]" > ~/.aws/credentials
+        echo "aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+        echo "aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+        echo "[default]" > ~/.aws/config
+        echo "region = ${{ secrets.AWS_DEFAULT_REGION }}" >> ~/.aws/config
+
     # Get the public IP of the runner machine (this is needed for IP Whitelist)
     - name: Get public IP
       id: get_ip
       run: echo "ip=$(curl -s ifconfig.me)" >> $GITHUB_ENV
 
-    # Whitelist the runner's IP in the security group
+    # Whitelist the runner's IP in the security group (Include the AWS region)
     - name: Whitelist inbound rule in security group
       run: |
         IP=${{ env.ip }}
-        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32 --region ${{ secrets.AWS_DEFAULT_REGION }}
 
     - name: Setup SSH for EC2 Deployment
       run: |
@@ -85,4 +95,4 @@ jobs:
     - name: Remove inbound rule from security group
       run: |
         IP=${{ env.ip }}
-        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32 --region ${{ secrets.AWS_DEFAULT_REGION }}
