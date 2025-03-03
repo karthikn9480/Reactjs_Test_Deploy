@@ -33,9 +33,28 @@ jobs:
     - name: Install sshpass
       run: sudo apt-get install sshpass -y
 
+    # Get the public IP of the runner machine (this is needed for IP Whitelist)
+    - name: Get public IP
+      id: get_ip
+      run: echo "ip=$(curl -s ifconfig.me)" >> $GITHUB_ENV
+
+    # Whitelist the runner's IP in the security group
+    - name: Whitelist inbound rule in security group
+      run: |
+        IP=${{ env.ip }}
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32
+
+    - name: Setup SSH for EC2 Deployment
+      run: |
+        mkdir -p ~/.ssh
+        touch ~/.ssh/known_hosts  # Make sure known_hosts file exists
+        chmod 600 ~/.ssh/known_hosts  # Set permissions to allow writing
+        # Add the EC2 host to known_hosts to avoid SSH prompts
+        ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
+
     - name: Verify SSH Connection
       run: |
-        # Verify if SSH works with the instance first using password-based authentication
+        # Verify if SSH works with the instance first using password
         echo "Checking SSH connection..."
         sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
 
@@ -53,11 +72,17 @@ jobs:
       run: |
         # Ensure the build directory is there
         ls -la ./dist  # Double-check for the build directory
-        
-        # Rsync build files to EC2 instance using password-based SSH
-        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "sshpass -p '${{ secrets.EC2_PASSWORD }}' ssh -o StrictHostKeyChecking=no" ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
+
+        # Rsync build files to EC2 instance
+        sshpass -p "${{ secrets.EC2_PASSWORD }}" rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./dist/ ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/var/www/html/
 
     - name: Restart Nginx on EC2
       run: |
         # Optionally restart the Nginx service on EC2
         sshpass -p "${{ secrets.EC2_PASSWORD }}" ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo systemctl restart nginx'
+
+    # Remove the IP from the whitelist after the deployment
+    - name: Remove inbound rule from security group
+      run: |
+        IP=${{ env.ip }}
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_SECURITY_GROUP_ID }} --protocol tcp --port 22 --cidr ${IP}/32
