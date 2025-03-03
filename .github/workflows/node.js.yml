@@ -42,11 +42,7 @@ jobs:
         echo "Checking SSH connection..."
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} "echo SSH connection successful"
 
-    - name: Ensure /var/www/html/ has correct permissions
-      run: |
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chown -R ubuntu:ubuntu /var/www/html/'
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo chmod -R 775 /var/www/html/'
-   
+  
     - name: Deploy to EC2 Instance
       run: |
         # Rsync build files with sudo
