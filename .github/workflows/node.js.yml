@@ -52,7 +52,7 @@ jobs:
         echo "Listing contents of the build directory:"
         ls -la ./dist
         # Rsync to EC2 instance
-        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'sudo rsync -avz --delete ./dist/ /var/www/html/'
+        ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PUBLIC_IP }} 'rsync -avz --delete ./dist/ /var/www/html/'
 
     - name: Set proper permissions for Nginx
       run: |
