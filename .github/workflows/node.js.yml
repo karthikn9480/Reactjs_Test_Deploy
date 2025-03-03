@@ -33,14 +33,6 @@ jobs:
     - name: Install sshpass
       run: sudo apt-get install sshpass -y
 
-    - name: Setup SSH for EC2 Deployment
-      run: |
-        mkdir -p ~/.ssh
-        touch ~/.ssh/known_hosts  # Make sure known_hosts file exists
-        chmod 600 ~/.ssh/known_hosts  # Set permissions to allow writing
-        # Add the EC2 host to known_hosts to avoid SSH prompts
-        ssh-keyscan -H "${{ secrets.EC2_PUBLIC_IP }}" >> ~/.ssh/known_hosts
-
     - name: Verify SSH Connection
       run: |
         # Verify if SSH works with the instance first using password-based authentication
