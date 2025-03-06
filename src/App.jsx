@@ -16,7 +16,7 @@ function App() {
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>
-      <h1>Deployed a Reactjs application using Jenkins!</h1>
+      <h1>Deployed a Reactjs application using Jenkins Git SCM Poll!</h1>
       <div className="card">
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
